@@ -14,3 +14,8 @@ Responsible AI, UT Austin, Spring 2019
 4. Run 'main_ensemble_classifier.py' to train an ensemble of 1-D classifier based on pregenerated latent representations. This script can be configured to work with 'embedding_type = {euclidean, cosine, l1}' and adds prototype vectors according to the proposed max-variance-first criteria in the paper.
 
 5. (Optional) Run 'main_synthetic_data_classifier.py' to generate synthetic data and train an incrementally increasing joint classifier with random or proposed ordering (for multiple distance embeddings).
+
+## Notes
+Pretrained adversarial autoencoders can be found in the corresponding folders for both MNIST and COIL-20. Make sure the path in 'main_adversarial.py' points to the correct path (the .h5 file).
+
+The decoded images are not particularly relevant, since prototype vectors are always snapped to nearest point near cluster center and binded with a strong regularization term during training.
