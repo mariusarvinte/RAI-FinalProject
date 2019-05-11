@@ -48,8 +48,8 @@ if data_type == 'mnist':
     x_train = x_train.astype(np.float32) / 255.
     x_test = x_test.astype(np.float32) / 255.
     
-    # Further draw validation from training
-    # 90/10 split
+    # Train/validation split
+    # 80/20 split
     x_train, x_val = np.split(x_train, [int(0.8*np.shape(x_train)[0])])
     y_train, y_val = np.split(y_train, [int(0.8*np.shape(y_train)[0])])
     
@@ -67,9 +67,10 @@ if data_type == 'mnist':
     
     # Training parameters
     batch_size = 200
-    num_epochs = 200
+    num_epochs = 60
     
 elif data_type == 'coil20':
+    # Load dataset (includes normalization)
     x, y = load_coil20('coil-20-proc')
     x = np.asarray(x)
     x = np.expand_dims(x, axis=-1)
@@ -87,23 +88,22 @@ elif data_type == 'coil20':
     num_classes = 20
     img_shape   = (128, 128, 1)
     
-    # Architecture parameters
+    # Deep network architecture parameters
     arch = 'Conv' # This is a major parameter
     latent_dim = 10
-    # If going with arch='FC', then hidden_dim needs to be >> nr. of pixels in image
     hidden_dim = 64
     num_layers  = 5 # Per encoder, decoder and discriminator each
     filter_size = 3
     
     # Training parameters
     batch_size = 32
-    num_epochs = 200
+    num_epochs = 60
 
 ## Operating mode
 # This is the most important setting
-# If set to 'blank', it will train a number of autoencoders (no prototypes)
+# If set to 'blank', it will train a number of adversarial autoencoders
 # If set to 'pretrained', it will preload an autoencoder from a specific
-# seed set and start adding prototype vectors
+# seed set and compute the latent representation
 #op_mode = 'pretrained'
 op_mode = 'blank'
 # How many autoencoders will be trained in 'blank' mode
@@ -120,7 +120,6 @@ batch_seed    = 321 # Don't change!
 np.random.seed(global_seed)
 weight_seed = np.random.randint(low=0, high=2**31, size=num_tries)
 
-
 ## Save-to-file frequency in epochs
 # Note that this also performs TSNE at each save which is CPU heavy
 save_interval = 10
@@ -130,33 +129,30 @@ save_interval = 10
 # Optimize the max-min pairwise distance via random draws
 # This takes a while, but only needs to be done once
 centroids = gen_centroids(latent_dim, num_classes,
-                          seed=centroid_seed, num_tries=int(1e5))
+                          seed=centroid_seed, num_tries=int(1e6))
 
 # In this mode, search for the best adversarial autoencoder
 if op_mode == 'blank':
     # Try multiple weight restarts
     for try_idx in range(num_tries):
-        # Seed tensorflow and numpy
-        tf.set_random_seed(weight_seed[try_idx])
-        tf.random.set_random_seed(weight_seed[try_idx])
-        np.random.seed(weight_seed[try_idx])
-        random.seed(weight_seed[try_idx])
-        
         # Clear graph and figures
         K.clear_session()
         tf.reset_default_graph()
         plt.close('all')
         
-        session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-        sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-        K.set_session(sess)
-
         # Seed tensorflow and numpy
         tf.set_random_seed(weight_seed[try_idx])
         tf.random.set_random_seed(weight_seed[try_idx])
         np.random.seed(weight_seed[try_idx])
+        random.seed(weight_seed[try_idx])
+                
+        # Tensorflow settings
+        session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+        sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+        K.set_session(sess)
         
         # Shuffle centroids with fixed permutations
+        # This allows to repeat simulations with same network, but shuffled cluster allocations
         np.random.seed(try_idx)
         np.random.shuffle(centroids)
         
@@ -165,11 +161,6 @@ if op_mode == 'blank':
                             filter_size, centroids, img_shape, global_seed,
                             weight_seed[try_idx], centroid_seed, batch_seed,
                             try_idx, arch)
-
-        # Seed tensorflow and numpy
-        tf.set_random_seed(weight_seed[try_idx])
-        tf.random.set_random_seed(weight_seed[try_idx])
-        np.random.seed(weight_seed[try_idx])
 
         # Train
         ann.train(x_train, y_train, x_val, y_val,
@@ -183,7 +174,8 @@ elif op_mode == 'pretrained':
                         weight_seed[0], centroid_seed, batch_seed,
                         0, arch)
     
-    # Load weights given by global/weight seed pair
+    # Load weights given by global/weight seed pair and try/epoch
+    # These can be found in the created folder structure in 'blank' mode
     target_global = 5678
     target_weight = 26474647
     target_try    = 1
