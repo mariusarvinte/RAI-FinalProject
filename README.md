@@ -1,6 +1,7 @@
 # RAI-FinalProject
 # Interpretable Image Classification via Deep Supervised Clustering
 Marius Arvinte, Mai Lee Chang and (Ethan) Yuqiang Heng
+
 Responsible AI, UT Austin, Spring 2019
 
 ## Instructions
